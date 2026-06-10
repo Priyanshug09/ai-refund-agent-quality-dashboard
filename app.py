@@ -24,9 +24,17 @@ from datetime import datetime
 # When key is present, agent.py's @traceable functions send traces to LangSmith.
 # When key is absent, everything still works — tracing is just skipped.
 if hasattr(st, "secrets"):
-    for key in ["LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2", "LANGCHAIN_PROJECT"]:
+    for key in ["LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2", "LANGCHAIN_PROJECT",
+                "LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"]:
         if key in st.secrets:
             os.environ[key] = st.secrets[key]
+
+    # langsmith SDK 0.1+ uses LANGSMITH_* variables
+    # Map LANGCHAIN_* → LANGSMITH_* so both work regardless of SDK version
+    if "LANGCHAIN_API_KEY" in st.secrets:
+        os.environ["LANGSMITH_API_KEY"]  = st.secrets["LANGCHAIN_API_KEY"]
+        os.environ["LANGSMITH_TRACING"]  = "true"
+        os.environ["LANGSMITH_PROJECT"]  = st.secrets.get("LANGCHAIN_PROJECT", "refund-agent-eval")
 
 LANGSMITH_PROJECT = os.environ.get("LANGCHAIN_PROJECT", "refund-agent-eval")
 LANGSMITH_ENABLED = bool(os.environ.get("LANGCHAIN_API_KEY"))

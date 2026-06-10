@@ -19,6 +19,19 @@ import os
 from datetime import datetime
 from mock_data import get_order, get_return_by_order, get_refund_by_order, get_policy
 
+# ── LangSmith — optional, gracefully disabled if key not set ──────────────────
+# When LANGCHAIN_API_KEY is set, every @traceable function automatically
+# creates a span in LangSmith. You see: inputs, outputs, latency, child spans.
+# When key is NOT set, @traceable is a no-op — the agent still runs normally.
+try:
+    from langsmith import traceable as _traceable
+    LANGSMITH_ENABLED = bool(os.environ.get("LANGCHAIN_API_KEY"))
+except ImportError:
+    LANGSMITH_ENABLED = False
+    def _traceable(*args, **kwargs):
+        def decorator(func): return func
+        return decorator
+
 # ── Intent taxonomy ────────────────────────────────────────────────────────────
 
 INTENT_MAP = {
@@ -39,6 +52,7 @@ INTENT_MAP = {
 }
 
 
+@_traceable(name="detect-intent", run_type="chain")
 def detect_intent(question: str) -> str:
     q = question.lower()
     for intent, keywords in INTENT_MAP.items():
@@ -49,6 +63,7 @@ def detect_intent(question: str) -> str:
 
 # ── Context fetching ───────────────────────────────────────────────────────────
 
+@_traceable(name="fetch-order-context", run_type="tool")
 def fetch_context(order_id: str) -> dict:
     """Pull all relevant data for one order. Mirrors what real API calls would return."""
     order  = get_order(order_id)
@@ -211,6 +226,11 @@ FAILURE_ANSWERS = {
 
 # ── Main agent entry point ─────────────────────────────────────────────────────
 
+@_traceable(
+    name="refund-agent-pipeline",
+    run_type="chain",
+    project_name="refund-agent-eval"   # this is your project name in LangSmith
+)
 def run_agent(question: str, order_id: str = "ORD-4582",
               inject_failure: str = None, failure_index: int = 0) -> dict:
     """

@@ -18,6 +18,19 @@ import json
 import os
 from datetime import datetime
 
+# ── Load LangSmith secrets from Streamlit Cloud ────────────────────────────────
+# In Streamlit Cloud: Settings → Secrets → add LANGCHAIN_API_KEY etc.
+# Locally: add them to .env
+# When key is present, agent.py's @traceable functions send traces to LangSmith.
+# When key is absent, everything still works — tracing is just skipped.
+if hasattr(st, "secrets"):
+    for key in ["LANGCHAIN_API_KEY", "LANGCHAIN_TRACING_V2", "LANGCHAIN_PROJECT"]:
+        if key in st.secrets:
+            os.environ[key] = st.secrets[key]
+
+LANGSMITH_PROJECT = os.environ.get("LANGCHAIN_PROJECT", "refund-agent-eval")
+LANGSMITH_ENABLED = bool(os.environ.get("LANGCHAIN_API_KEY"))
+
 # Auto-generate sample data if CSV doesn't exist.
 # This runs on first boot on Streamlit Cloud (no pre-generated CSV there).
 if not os.path.exists("sample_outputs.csv"):
@@ -183,6 +196,15 @@ with st.sidebar:
         "calculates quality metrics, and recommends product fixes. "
         "No LLM key required to run."
     )
+    st.divider()
+    st.markdown("**LangSmith**")
+    if LANGSMITH_ENABLED:
+        st.success("Connected")
+        st.caption(f"Project: `{LANGSMITH_PROJECT}`")
+        st.markdown("[Open LangSmith ↗](https://smith.langchain.com)")
+    else:
+        st.warning("Not connected")
+        st.caption("Add `LANGCHAIN_API_KEY` in Streamlit → Settings → Secrets to enable real tracing.")
     st.divider()
     st.caption("github.com/Priyanshug09/PM-Portfolio")
 

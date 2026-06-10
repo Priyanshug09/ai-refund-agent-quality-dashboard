@@ -530,6 +530,34 @@ with tab3:
             trace  = run_agent(question=live_question.strip(), order_id=order_id)
             result = evaluate(trace["ai_answer"], trace)
 
+            # ── Direct LangSmith trace via REST API ────────────────────────────
+            # This bypasses @traceable and sends directly — guaranteed to work
+            langsmith_url = None
+            if LANGSMITH_ENABLED:
+                try:
+                    from langsmith import Client
+                    ls = Client()
+                    import uuid
+                    run_id = str(uuid.uuid4())
+                    ls.create_run(
+                        name="refund-agent-pipeline",
+                        run_type="chain",
+                        inputs={"question": live_question.strip(), "order_id": order_id},
+                        outputs={
+                            "answer":  trace["ai_answer"],
+                            "intent":  trace["intent"],
+                            "label":   result["label"],
+                            "reason":  result["reason"],
+                        },
+                        project_name=LANGSMITH_PROJECT,
+                        id=run_id,
+                        extra={"metadata": {"latency_ms": trace["latency_ms"]}}
+                    )
+                    ls.update_run(run_id, end_time=__import__("datetime").datetime.utcnow())
+                    langsmith_url = f"https://smith.langchain.com"
+                except Exception as e:
+                    langsmith_url = f"ERROR: {e}"
+
         lc = LABEL_COLOURS.get(result["label"], {"fg": "#9CA3AF"})
         col1, col2 = st.columns(2)
         with col1:
@@ -550,8 +578,10 @@ with tab3:
             st.caption(f"Fix: {result['fix']}")
             st.caption(f"Latency: {trace['latency_ms']} ms  |  Intent: {trace['intent']}")
 
-        if LANGSMITH_ENABLED:
-            st.success(f"Trace sent to LangSmith → open smith.langchain.com → project '{LANGSMITH_PROJECT}' to see it.")
+        if langsmith_url and not langsmith_url.startswith("ERROR"):
+            st.success(f"✅ Trace logged to LangSmith → open smith.langchain.com → project '{LANGSMITH_PROJECT}'")
+        elif langsmith_url and langsmith_url.startswith("ERROR"):
+            st.error(f"LangSmith error: {langsmith_url}")
         else:
             st.warning("LangSmith not connected — trace ran locally only.")
 

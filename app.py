@@ -486,20 +486,66 @@ with tab3:
 
         # LangSmith callout
         st.divider()
-        st.markdown("#### 🔌 LangSmith Integration")
-        st.info(
-            "To enable real LangSmith tracing, set `LANGCHAIN_API_KEY` in `.env` and "
-            "wrap `run_agent()` with `@traceable` from `langsmith.run_helpers`. "
-            "Each run will then appear in your LangSmith project dashboard with full "
-            "latency, token counts, and eval scores."
-        )
-        st.code(
-            'from langsmith.run_helpers import traceable\n\n'
-            '@traceable(name="refund-agent")\n'
-            'def run_agent(question, order_id):\n'
-            '    ...  # your existing agent code',
-            language="python"
-        )
+        if LANGSMITH_ENABLED:
+            st.success(f"✅ LangSmith connected — project: `{LANGSMITH_PROJECT}`. Every query below sends a real trace.")
+        else:
+            st.warning("⚠️ LangSmith not connected. Add `LANGCHAIN_API_KEY` to Streamlit → Settings → Secrets.")
+
+    st.divider()
+    st.markdown("#### Run a Live Query — sends real trace to LangSmith")
+    st.caption("This calls run_agent() directly. The @traceable decorator fires and logs the full span tree to LangSmith.")
+
+    with st.form("live_trace_form"):
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            live_order = st.selectbox("Order", [
+                "ORD-4582 — Nike Shoes (refund initiated)",
+                "ORD-3891 — Sony Headphones (pickup scheduled)",
+                "ORD-2244 — JBL Speaker (refund completed)",
+                "ORD-5119 — Backpack (partial refund)",
+                "ORD-6670 — Smart Watch (shipped)"
+            ])
+        with col_b:
+            live_question = st.text_input(
+                "Question",
+                placeholder="e.g. Where is my refund? / Why did I get a partial refund?"
+            )
+        run_btn = st.form_submit_button("Run & Trace →")
+
+    if run_btn and live_question.strip():
+        from agent import run_agent
+        from evaluator import evaluate
+
+        order_id = live_order.split(" — ")[0]
+
+        with st.spinner("Running agent + sending trace to LangSmith..."):
+            trace  = run_agent(question=live_question.strip(), order_id=order_id)
+            result = evaluate(trace["ai_answer"], trace)
+
+        lc = LABEL_COLOURS.get(result["label"], {"fg": "#9CA3AF"})
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**AI Answer**")
+            if result["label"] == "Grounded":
+                st.success(trace["ai_answer"])
+            elif result["label"] == "Hallucinated":
+                st.error(trace["ai_answer"])
+            else:
+                st.warning(trace["ai_answer"])
+        with col2:
+            st.markdown("**Evaluation**")
+            st.markdown(
+                f"<span style='color:{lc['fg']};font-size:16px;font-weight:700'>{result['label']}</span>",
+                unsafe_allow_html=True
+            )
+            st.caption(f"Reason: {result['reason']}")
+            st.caption(f"Fix: {result['fix']}")
+            st.caption(f"Latency: {trace['latency_ms']} ms  |  Intent: {trace['intent']}")
+
+        if LANGSMITH_ENABLED:
+            st.success(f"Trace sent to LangSmith → open smith.langchain.com → project '{LANGSMITH_PROJECT}' to see it.")
+        else:
+            st.warning("LangSmith not connected — trace ran locally only.")
 
 st.divider()
 st.caption(

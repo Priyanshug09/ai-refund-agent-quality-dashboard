@@ -75,6 +75,7 @@ def fetch_context(order_id: str) -> dict:
 
 # ── Answer generation (simulated — no LLM key needed) ─────────────────────────
 
+@_traceable(name="generate-answer", run_type="llm")
 def _grounded_answer(intent: str, context: dict) -> dict:
     """
     Generates the CORRECT answer using only verified data from context.

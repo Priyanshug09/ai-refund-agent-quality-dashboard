@@ -48,7 +48,13 @@ INTENT_MAP = {
                          "expected date", "timeline", "when will i get",
                          "when will the refund", "when will my refund",
                          "will the refund be credited", "refund be credited",
-                         "when will", "how long will"]
+                         "when will", "how long will"],
+    "order_status":     ["where is my order", "track my order", "order status",
+                         "where is my package", "has my order shipped",
+                         "when will it arrive", "order tracking",
+                         "my order status", "delivery status",
+                         "is my order on the way", "order not received",
+                         "where is my shipment", "track my shipment"]
 }
 
 
